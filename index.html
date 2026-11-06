@@ -1,0 +1,2275 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Inventario" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <title>Inventario SAP</title>
+  <!-- Libreria Scanner Barcode/QR -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <!-- Libreria OCR Testo -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --card-border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --accent: #6366f1;
+      --success: #10b981;
+      --success-bg: rgba(16, 185, 129, 0.16);
+      --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.16);
+      --warning: #f59e0b;
+      --warning-bg: rgba(245, 158, 11, 0.16);
+      --radius: 14px;
+      --wheel-item-h: 48px;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      max-width: 100vw;
+      overflow-x: hidden;
+      overscroll-behavior-x: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #1e293b;
+      border-bottom: 1px solid var(--card-border);
+      padding: 10px 12px;
+      width: 100%;
+      max-width: 100vw;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      position: sticky;
+      top: 0;
+      z-index: 30;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+      font-size: 0.98rem;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .status-pill {
+      font-size: 0.74rem;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(59, 130, 246, 0.18);
+      color: #93c5fd;
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 155px;
+    }
+
+    main {
+      flex: 1;
+      max-width: 540px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-x: hidden;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 100%;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 14px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+    }
+
+    .card-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin: 0 0 12px 0;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Bottoni fotocamera e selettore */
+    .cam-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .btn-wheel-trigger {
+      width: 100%;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #4f46e5, #2563eb);
+      border: 1px solid rgba(147, 197, 253, 0.35);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.28);
+    }
+
+    .btn {
+      appearance: none;
+      border: none;
+      border-radius: 10px;
+      padding: 13px 14px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 0.08s ease, opacity 0.15s ease, background 0.15s ease;
+      color: var(--text);
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+    }
+
+    .btn-secondary {
+      background: #334155;
+      border: 1px solid #475569;
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: #052e16;
+      font-weight: 700;
+    }
+
+    .btn-warning {
+      background: var(--warning);
+      color: #451a03;
+      font-weight: 700;
+    }
+
+    .btn-danger-outline {
+      background: transparent;
+      border: 1px solid var(--danger);
+      color: #fca5a5;
+    }
+
+    /* Area Telecamera */
+    #camera-wrapper {
+      display: none;
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      margin-bottom: 12px;
+      border: 2px solid var(--primary);
+    }
+
+    #reader {
+      width: 100%;
+    }
+
+    #ocr-video {
+      width: 100%;
+      max-height: 260px;
+      object-fit: cover;
+      display: none;
+    }
+
+    .ocr-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ocr-target-box {
+      width: 82%;
+      height: 70px;
+      border: 2px dashed #38bdf8;
+      border-radius: 8px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+    }
+
+    .camera-footer {
+      display: flex;
+      gap: 8px;
+      padding: 8px;
+      background: #0f172a;
+    }
+
+    /* ==========================================================================
+       SELETTORE A RULLO (STILE SCORRIMENTO ANNI) PER CODICI ORDINATI
+       ========================================================================== */
+    #wheel-picker-panel {
+      display: none;
+      background: #0f172a;
+      border: 1px solid #3b82f6;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .wheel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .wheel-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #93c5fd;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .wheel-jump-bar {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 6px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-x;
+      padding: 2px 2px 8px 2px;
+      margin-bottom: 6px;
+      scrollbar-width: thin;
+      scrollbar-color: #475569 transparent;
+    }
+
+    .wheel-jump-bar::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    .wheel-jump-bar::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 999px;
+    }
+
+    .jump-chip {
+      appearance: none;
+      flex: 0 0 auto;
+      white-space: nowrap;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .jump-chip:hover {
+      border-color: #60a5fa;
+      color: #ffffff;
+    }
+
+    .jump-chip.active,
+    .jump-chip:active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .wheel-viewport {
+      position: relative;
+      width: 100%;
+      height: calc(var(--wheel-item-h) * 5); /* 5 righe visibili, quella centrale è attiva */
+      background: #090d16;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #1e293b;
+    }
+
+    /* Sfumatura superiore e inferiore effetto tamburo 3D */
+    .wheel-viewport::before,
+    .wheel-viewport::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: calc(var(--wheel-item-h) * 1.85);
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .wheel-viewport::before {
+      top: 0;
+      background: linear-gradient(to bottom, rgba(9, 13, 22, 0.95) 10%, rgba(9, 13, 22, 0));
+    }
+
+    .wheel-viewport::after {
+      bottom: 0;
+      background: linear-gradient(to top, rgba(9, 13, 22, 0.95) 10%, rgba(9, 13, 22, 0));
+    }
+
+    /* Fascia centrale di messa a fuoco (lente selettore) */
+    .wheel-highlight {
+      position: absolute;
+      top: calc(var(--wheel-item-h) * 2);
+      left: 6px;
+      right: 6px;
+      height: var(--wheel-item-h);
+      border-radius: 8px;
+      background: rgba(59, 130, 246, 0.16);
+      border-top: 1.5px solid #60a5fa;
+      border-bottom: 1.5px solid #60a5fa;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .wheel-scroller {
+      width: 100%;
+      height: 100%;
+      overflow-y: scroll;
+      overflow-x: hidden;
+      touch-action: pan-y;
+      overscroll-behavior-x: none;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      position: relative;
+      z-index: 1;
+    }
+
+    .wheel-scroller::-webkit-scrollbar {
+      display: none;
+    }
+
+    .wheel-spacer {
+      height: calc(var(--wheel-item-h) * 2);
+    }
+
+    .wheel-item {
+      width: 100%;
+      max-width: 100%;
+      height: var(--wheel-item-h);
+      scroll-snap-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      cursor: pointer;
+      user-select: none;
+      overflow: hidden;
+      transition: color 0.12s ease, opacity 0.12s ease;
+      color: #64748b;
+      font-size: 0.92rem;
+    }
+
+    .wheel-item.active {
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 1.04rem;
+    }
+
+    .wheel-code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-weight: 800;
+      color: #93c5fd;
+      flex: 0 0 auto;
+    }
+
+    .wheel-item.active .wheel-code {
+      color: #38bdf8;
+      font-size: 1.12rem;
+    }
+
+    .wheel-desc {
+      flex: 1 1 0%;
+      min-width: 0;
+      margin-left: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: right;
+      font-size: 0.82rem;
+    }
+
+    .wheel-item.active .wheel-desc {
+      color: #e2e8f0;
+      font-weight: 600;
+    }
+
+    .wheel-preview-bar {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: #1e293b;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      font-size: 0.86rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .wheel-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    /* Input Codice Manuale */
+    .search-row {
+      display: flex;
+      gap: 8px;
+      position: relative;
+    }
+
+    .input-field {
+      width: 100%;
+      padding: 13px 14px;
+      border-radius: 10px;
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: var(--text);
+      font-size: 1.05rem;
+      font-weight: 600;
+      outline: none;
+    }
+
+    .input-field:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    }
+
+    /* Suggerimenti autocompletamento */
+    #suggestions {
+      margin-top: 8px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+      display: none;
+      background: #0f172a;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .suggestion-item {
+      padding: 10px 12px;
+      border-bottom: 1px solid #1e293b;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .suggestion-item:last-child {
+      border-bottom: none;
+    }
+
+    .suggestion-item:active,
+    .suggestion-item:hover {
+      background: #1e293b;
+    }
+
+    .sug-code {
+      font-weight: 700;
+      color: #60a5fa;
+      font-size: 0.95rem;
+    }
+
+    .sug-desc {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* Scheda Prodotto Trovato */
+    #product-card {
+      display: none;
+      border-color: #3b82f6;
+    }
+
+    .sap-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .sap-box {
+      background: #0f172a;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+    }
+
+    .sap-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    .sap-val {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-top: 3px;
+      word-break: break-all;
+    }
+
+    .desc-box {
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      padding: 14px;
+      border-radius: 10px;
+      margin-bottom: 14px;
+    }
+
+    .desc-text {
+      font-size: 1.18rem;
+      font-weight: 700;
+      color: #eff6ff;
+      margin-top: 4px;
+      line-height: 1.35;
+    }
+
+    .already-counted-banner {
+      display: none;
+      background: var(--warning-bg);
+      border: 1px solid var(--warning);
+      color: #fde68a;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      margin-bottom: 14px;
+    }
+
+    /* Stepper quantità */
+    #quantity-section {
+      display: block;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--card-border);
+    }
+
+    .qty-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      margin-top: 8px;
+      margin-bottom: 14px;
+    }
+
+    .qty-btn {
+      flex: 0 0 54px;
+      width: 54px;
+      height: 52px;
+      font-size: 1.5rem;
+      font-weight: 700;
+      border-radius: 10px;
+      background: #334155;
+      color: white;
+      border: 1px solid #475569;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    .qty-input {
+      flex: 0 1 130px;
+      width: 130px;
+      min-width: 80px;
+      max-width: 140px;
+      height: 52px;
+      text-align: center;
+      font-size: 1.45rem;
+      font-weight: 800;
+      border-radius: 10px;
+      border: 2px solid var(--primary);
+      background: #0f172a;
+      color: white;
+      padding: 0 6px;
+    }
+
+    .duplicate-actions {
+      display: none;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    /* Scheda Nuovo Articolo Ex-Novo */
+    #new-item-card {
+      display: none;
+      border-color: var(--warning);
+      background: linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, var(--card) 100%);
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      color: #cbd5e1;
+      letter-spacing: 0.04em;
+      margin-bottom: 5px;
+      font-weight: 700;
+    }
+
+    .btn-add-new-inline {
+      margin-top: 10px;
+      width: 100%;
+      background: var(--warning);
+      color: #451a03;
+      font-weight: 800;
+    }
+
+    /* Messaggi di esito */
+    #toast {
+      display: none;
+      padding: 14px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+
+    .toast-zero {
+      background: var(--success-bg);
+      border: 1px solid var(--success);
+      color: #6ee7b7;
+    }
+
+    .toast-diff {
+      background: var(--danger-bg);
+      border: 1px solid var(--danger);
+      color: #fca5a5;
+    }
+
+    /* Cronologia */
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background: #0f172a;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      font-size: 0.88rem;
+    }
+
+    .badge-diff {
+      padding: 4px 9px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.82rem;
+    }
+
+    .badge-green {
+      background: var(--success-bg);
+      color: #34d399;
+      border: 1px solid var(--success);
+    }
+
+    .badge-red {
+      background: var(--danger-bg);
+      color: #f87171;
+      border: 1px solid var(--danger);
+    }
+
+    .operator-pill {
+      font-size: 0.78rem;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.16);
+      color: #6ee7b7;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      cursor: pointer;
+      user-select: none;
+      font-weight: 700;
+    }
+
+    /* Modale scelta Nome Operatore */
+    #operator-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(9, 13, 22, 0.85);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+
+    .modal-box {
+      background: var(--card);
+      border: 1px solid var(--primary);
+      border-radius: var(--radius);
+      padding: 20px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- MODALE IDENTIFICAZIONE OPERATORE (Compare la prima volta o cliccando sul nome in alto) -->
+  <div id="operator-modal">
+    <div class="modal-box">
+      <div style="font-weight:800; font-size:1.1rem; margin-bottom:6px; color:#f8fafc;">
+        👤 Chi sta facendo l'inventario?
+      </div>
+      <div style="font-size:0.85rem; color:var(--muted); margin-bottom:14px; line-height:1.35;">
+        Inserisci il tuo nome o sigla. Verrà salvato su questo telefono e scritto nella <strong>Colonna F (Operatore)</strong> ad ogni invio.
+      </div>
+      <input
+        id="operator-input"
+        type="text"
+        class="input-field"
+        placeholder="Es. Claudio, Marco..."
+        autocomplete="off"
+        onkeydown="if(event.key==='Enter') saveOperatorName()"
+      />
+      <button type="button" class="btn btn-primary" style="width:100%; margin-top:12px;" onclick="saveOperatorName()">
+        ✔ Conferma Operatore
+      </button>
+    </div>
+  </div>
+
+  <!-- MODALE CONFIGURAZIONE COLLEGAMENTO GOOGLE DRIVE (Apps Script URL) -->
+  <div id="settings-modal" style="display:none; position:fixed; inset:0; background:rgba(9, 13, 22, 0.85); z-index:100; align-items:center; justify-content:center; padding:18px;">
+    <div class="modal-box">
+      <div style="font-weight:800; font-size:1.1rem; margin-bottom:6px; color:#f8fafc;">
+        ⚙️ Collegamento Google Drive
+      </div>
+      <div style="font-size:0.85rem; color:var(--muted); margin-bottom:14px; line-height:1.35;">
+        Incolla l'URL dell'applicazione Web Google Apps Script (termina con <code>/exec</code>) per sincronizzare il foglio Excel:
+      </div>
+      <input
+        id="api-url-input"
+        type="url"
+        class="input-field"
+        placeholder="https://script.google.com/macros/s/.../exec"
+        autocomplete="off"
+      />
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <button type="button" class="btn btn-primary" style="flex:1;" onclick="saveApiUrl()">
+          💾 Salva e Connetti
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="closeSettingsModal()">
+          Chiudi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <header>
+    <div class="brand">
+      <span>📦 Inventario</span>
+    </div>
+    <div style="display:flex; gap:6px; align-items:center;">
+      <div id="operator-badge" class="operator-pill" onclick="openOperatorModal()" title="Tocca per cambiare operatore">
+        👤 Operatore
+      </div>
+      <div id="catalog-status" class="status-pill" onclick="onCatalogBadgeClick()" title="Tocca per aggiornare o collegare">
+        ⏳ Caricamento...
+      </div>
+      <button type="button" class="btn" style="padding:5px 9px; font-size:0.82rem; background:#334155; border-radius:999px; line-height:1;" onclick="openSettingsModal()" title="Impostazioni Google Sheets">
+        ⚙️
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 1. SCANSIONE, SELETTORE A SCORRIMENTO O INSERIMENTO CODICE MATERIALE -->
+    <section class="card">
+      <div class="card-title">
+        <span>1. Cerca Materiale (Col. A)</span>
+        <span id="scan-mode-label" style="font-size:0.75rem; color:#60a5fa;"></span>
+      </div>
+
+      <!-- Pulsanti Fotocamera -->
+      <div class="cam-actions">
+        <button type="button" class="btn btn-primary" onclick="startBarcodeScanner()">
+          📷 Barcode / QR
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="startOcrScanner()">
+          🔤 Leggi Testo (OCR)
+        </button>
+      </div>
+
+      <!-- Input Fotocamera Nativa di Fallback (quando l'iframe Google blocca lo streaming live) -->
+      <input
+        id="native-camera-barcode"
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style="display:none;"
+        onchange="onNativePhotoSelected(this, 'barcode')"
+      />
+      <input
+        id="native-camera-ocr"
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style="display:none;"
+        onchange="onNativePhotoSelected(this, 'ocr')"
+      />
+
+      <!-- NUOVO PULSANTE: RICERCA PER CODICE A SCORRIMENTO (STILE SELETTORE ANNI) -->
+      <button type="button" class="btn btn-wheel-trigger" onclick="toggleWheelPicker()">
+        🎡 Ricerca per codice (Scorrimento <span id="wheel-range-label">Crescente</span>)
+      </button>
+
+      <!-- PANNELLO TAMBURO / RULLO CODICI ORDINATI DAL PIU' PICCOLO AL PIU' GRANDE -->
+      <div id="wheel-picker-panel">
+        <div class="wheel-header">
+          <span class="wheel-title">Scorri i codici (dal più piccolo al più grande)</span>
+          <span id="wheel-pos-indicator" style="font-size:0.75rem; color:#94a3b8;">1 / 0</span>
+        </div>
+
+        <!-- Salti rapidi per fasce di codice (come saltare i decenni negli anni) -->
+        <div id="wheel-jump-bar" class="wheel-jump-bar"></div>
+
+        <!-- Finestra tamburo con lente centrale -->
+        <div class="wheel-viewport">
+          <div class="wheel-highlight"></div>
+          <div id="wheel-scroller" class="wheel-scroller" onscroll="onWheelScroll()">
+            <div class="wheel-spacer"></div>
+            <div id="wheel-items-container"></div>
+            <div class="wheel-spacer"></div>
+          </div>
+        </div>
+
+        <!-- Anteprima completa del codice attualmente al centro del rullo -->
+        <div class="wheel-preview-bar">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span id="wheel-sel-code" style="font-weight:800; color:#38bdf8; font-size:1rem;">-</span>
+            <span id="wheel-sel-meta" style="font-size:0.76rem; color:#94a3b8;">Pezzi: -</span>
+          </div>
+          <div id="wheel-sel-desc" style="color:#f8fafc; font-weight:600;">Scorri il rullo per scegliere un articolo</div>
+        </div>
+
+        <div class="wheel-actions">
+          <button type="button" class="btn btn-success" style="flex:1;" onclick="confirmWheelSelection()">
+            ✔ Seleziona questo Codice
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="closeWheelPicker()">
+            Chiudi
+          </button>
+        </div>
+      </div>
+
+      <!-- Area Video Fotocamera -->
+      <div id="camera-wrapper">
+        <div id="reader"></div>
+        <video id="ocr-video" autoplay playsinline muted></video>
+        <div id="ocr-overlay" class="ocr-overlay">
+          <div class="ocr-target-box"></div>
+        </div>
+        <div class="camera-footer">
+          <button id="btn-capture-ocr" type="button" class="btn btn-primary" style="flex:1; display:none;" onclick="captureOcrFrame()">
+            📸 Cattura Codice nel Riquadro
+          </button>
+          <button type="button" class="btn btn-danger-outline" onclick="stopAllCameras()">
+            ✖ Chiudi Fotocamera
+          </button>
+        </div>
+      </div>
+
+      <!-- Inserimento / Correzione Manuale -->
+      <div class="search-row">
+        <input
+          id="code-input"
+          type="text"
+          class="input-field"
+          placeholder="Digita o correggi codice / descrizione..."
+          autocomplete="off"
+          oninput="onCodeInputChange(this.value)"
+          onkeydown="if(event.key==='Enter') searchByInput()"
+        />
+        <button type="button" class="btn btn-primary" onclick="searchByInput()">
+          Cerca
+        </button>
+      </div>
+
+      <!-- Menu a tendina suggerimenti rapidi -->
+      <div id="suggestions"></div>
+
+      <!-- Pulsante rapido per creare direttamente un articolo non a elenco -->
+      <button type="button" class="btn btn-secondary" style="width:100%; margin-top:10px; font-size:0.86rem; padding:10px;" onclick="openNewItemForm(document.getElementById('code-input').value.trim())">
+        ➕ Codice non presente in lista? Aggiungi nuovo articolo
+      </button>
+    </section>
+
+    <!-- MESSAGGIO DI ESITO SALVATAGGIO -->
+    <div id="toast"></div>
+
+    <!-- 2B. SCHEDA INSERIMENTO NUOVO CODICE EX-NOVO SUL FILE EXCEL -->
+    <section id="new-item-card" class="card">
+      <div class="card-title" style="color:#fbbf24;">
+        <span>➕ Aggiungi Nuovo Materiale sul File</span>
+        <span style="font-size:0.75rem; color:#fde68a;">Nuova Riga (A→E)</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="new-mat">Materiale (Col. A) *</label>
+        <input id="new-mat" type="text" class="input-field" placeholder="Es. 605999" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="new-desc">Descr. materiale (Col. B) *</label>
+        <input id="new-desc" type="text" class="input-field" placeholder="Inserisci descrizione del pezzo..." />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="new-qty">Rilevato (Col. D) * — (Pezzi Col. C = 0)</label>
+        <div class="qty-row" style="margin-top:4px;">
+          <button type="button" class="qty-btn" onclick="stepNewQty(-1)">−</button>
+          <input
+            id="new-qty"
+            type="number"
+            step="any"
+            min="0"
+            inputmode="decimal"
+            class="qty-input"
+            placeholder="1"
+            value="1"
+            onkeydown="if(event.key==='Enter') submitNewItem()"
+          />
+          <button type="button" class="qty-btn" onclick="stepNewQty(1)">+</button>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px;">
+        <button id="btn-submit-new" type="button" class="btn btn-warning" style="flex:1; padding:14px;" onclick="submitNewItem()">
+          💾 Salva Nuovo Codice su Excel
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="closeNewItemForm()">
+          Annulla
+        </button>
+      </div>
+    </section>
+
+    <!-- 2. SCHEDA CONFERMA PRODOTTO E INVIO QUANTITA' -->
+    <section id="product-card" class="card">
+      <div class="card-title">
+        <span>2. Verifica Articolo</span>
+        <span id="item-row-badge" style="color:#94a3b8;">Riga #</span>
+      </div>
+
+      <div class="sap-grid">
+        <div class="sap-box">
+          <div class="sap-label">Materiale (Col. A)</div>
+          <div id="item-mat" class="sap-val" style="color:#60a5fa;">-</div>
+        </div>
+        <div class="sap-box">
+          <div class="sap-label">Pezzi (Col. C)</div>
+          <div id="item-sap-qty" class="sap-val">-</div>
+        </div>
+      </div>
+
+      <div class="desc-box">
+        <div class="sap-label" style="color:#93c5fd;">Descr. materiale (Col. B)</div>
+        <div id="item-desc" class="desc-text">-</div>
+      </div>
+
+      <!-- Avviso se esiste già una quantità rilevata in Colonna D -->
+      <div id="already-counted" class="already-counted-banner"></div>
+
+      <!-- Blocco di conferma intermedia (mostrato solo quando il codice arriva da Fotocamera EAN o OCR) -->
+      <div id="camera-confirm-gate" style="display:none; flex-direction:column; gap:8px; margin-top:6px;">
+        <button type="button" class="btn btn-success" style="width:100%; padding:14px;" onclick="unlockQuantityFromCamera()">
+          ✅ Sì, è questo prodotto (Inserisci Quantità)
+        </button>
+        <button type="button" class="btn btn-secondary" style="width:100%;" onclick="correctScannedCode()">
+          ✏️ Codice errato / Correggi manualmente
+        </button>
+      </div>
+
+      <!-- Sezione Inserimento Quantità Rilevata (Col. D) -->
+      <div id="quantity-section">
+        <div class="sap-label" style="margin-bottom:4px; color:#6ee7b7; font-weight:700;">
+          ✍️ Inserisci o Modifica Quantità Rilevata (Col. D)
+        </div>
+
+        <div class="qty-row">
+          <button type="button" class="qty-btn" onclick="stepQty(-1)">−</button>
+          <input
+            id="qty-input"
+            type="text"
+            inputmode="decimal"
+            class="qty-input"
+            placeholder="0"
+            onclick="this.select()"
+            onkeydown="if(event.key==='Enter') handlePrimarySave()"
+          />
+          <button type="button" class="qty-btn" onclick="stepQty(1)">+</button>
+        </div>
+
+        <!-- Bottone standard (prima volta che si conta l'articolo) -->
+        <button id="btn-save-single" type="button" class="btn btn-success" style="width:100%; padding:15px;" onclick="submitInventory('replace')">
+          ✅ CONFERMA E INVIA SUL FOGLIO EXCEL
+        </button>
+
+        <!-- Doppio bottone se l'articolo aveva già un valore in Colonna F -->
+        <div id="duplicate-actions" class="duplicate-actions">
+          <button type="button" class="btn btn-success" onclick="submitInventory('add')">
+            ➕ Somma al precedente
+          </button>
+          <button type="button" class="btn btn-warning" onclick="submitInventory('replace')">
+            🔄 Sovrascrivi valore
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. ULTIMI RILEVAMENTI DELLA SESSIONE -->
+    <section class="card">
+      <div class="card-title">
+        <span>Ultimi Invii effettuati</span>
+        <span id="session-counter">0</span>
+      </div>
+      <div id="history-list" class="history-list">
+        <div style="color:var(--muted); font-size:0.85rem; text-align:center; padding:8px;">
+          Nessun articolo ancora inviato in questa sessione.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const WHEEL_ITEM_HEIGHT = 48;
+    let catalog = [];
+    let sortedWheelCatalog = [];
+    let currentWheelIndex = 0;
+    let selectedItem = null;
+    let html5QrCode = null;
+    let ocrStream = null;
+    let sessionHistory = [];
+    let wheelScrollRAF = null;
+    let currentOperator = '';
+
+    /* ==========================================================================
+       COLLEGAMENTO AL FOGLIO GOOGLE (API Apps Script)
+       Incolla qui l'URL /exec del deployment Apps Script.
+       In alternativa apri una volta la pagina con ?api=URL_EXEC e verrà memorizzato.
+       ========================================================================== */
+    const DEFAULT_API_URL = 'INCOLLA_QUI_URL_EXEC';
+
+    function getApiUrl() {
+      try {
+        const qp = new URLSearchParams(window.location.search).get('api');
+        if (qp) localStorage.setItem('inv_sap_api_url', qp.trim());
+      } catch (e) {}
+      let saved = '';
+      try { saved = (localStorage.getItem('inv_sap_api_url') || '').trim(); } catch (e) {}
+      if (saved) return saved;
+      return DEFAULT_API_URL.indexOf('https://') === 0 ? DEFAULT_API_URL : '';
+    }
+
+    let API_URL = getApiUrl();
+
+    function openSettingsModal() {
+      const modal = document.getElementById('settings-modal');
+      const input = document.getElementById('api-url-input');
+      input.value = API_URL || '';
+      modal.style.display = 'flex';
+      setTimeout(() => input.focus(), 50);
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settings-modal').style.display = 'none';
+    }
+
+    function saveApiUrl() {
+      const input = document.getElementById('api-url-input');
+      const val = input.value.trim();
+      if (val && !val.startsWith('https://')) {
+        alert('Inserisci un URL valido che inizia con https://');
+        return;
+      }
+      try {
+        if (val) {
+          localStorage.setItem('inv_sap_api_url', val);
+        } else {
+          localStorage.removeItem('inv_sap_api_url');
+        }
+      } catch (e) {}
+      API_URL = getApiUrl();
+      closeSettingsModal();
+      loadCatalog();
+    }
+
+    async function apiCatalog() {
+      const res = await fetch(API_URL + '?action=catalog&t=' + Date.now(), { method: 'GET' });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'Errore sconosciuto');
+      return json.data;
+    }
+
+    async function apiPost(action, payload) {
+      // text/plain evita il preflight CORS che Apps Script non supporta
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: action, payload: payload })
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'Errore sconosciuto');
+      return json.data;
+    }
+
+    function getStoredOperator() {
+      try {
+        const qp = new URLSearchParams(window.location.search).get('op');
+        if (qp) return qp.trim();
+      } catch (e) {}
+      try {
+        return (localStorage.getItem('inv_sap_operatore') || '').trim();
+      } catch (e) {}
+      return '';
+    }
+
+    function persistOperator(name) {
+      try {
+        localStorage.setItem('inv_sap_operatore', name);
+      } catch (e) {}
+    }
+
+    function initOperator() {
+      currentOperator = getStoredOperator();
+      if (currentOperator) {
+        persistOperator(currentOperator);
+        document.getElementById('operator-badge').textContent = '👤 ' + currentOperator;
+      } else {
+        openOperatorModal();
+      }
+    }
+
+    function openOperatorModal() {
+      const modal = document.getElementById('operator-modal');
+      const input = document.getElementById('operator-input');
+      input.value = currentOperator;
+      modal.style.display = 'flex';
+      setTimeout(() => input.focus(), 50);
+    }
+
+    function saveOperatorName() {
+      const val = document.getElementById('operator-input').value.trim();
+      if (!val) {
+        alert('Inserisci il tuo nome o sigla per continuare.');
+        return;
+      }
+      currentOperator = val;
+      persistOperator(currentOperator);
+      document.getElementById('operator-badge').textContent = '👤 ' + currentOperator;
+      document.getElementById('operator-modal').style.display = 'none';
+    }
+
+    // Campione locale dell'elenco a 5 colonne (usato in anteprima offline fuori da Google Sheet)
+    const SAMPLE_EXTRACT = [
+      { rowNumber: 2,  materiale: '391147',      descrizione: 'Pasta termoconduttrice KP12',              pezziSap: 1 },
+      { rowNumber: 3,  materiale: '402223',      descrizione: 'Vite M 5 x 8 DIN  912  8.8',               pezziSap: 8 },
+      { rowNumber: 4,  materiale: '402500',      descrizione: 'Vite ISO 4762-M 8 X  25- 8.8',             pezziSap: 2 },
+      { rowNumber: 5,  materiale: '402511',      descrizione: 'Vite  M 8 X  20 DIN  912',                 pezziSap: 1 },
+      { rowNumber: 6,  materiale: '409235',      descrizione: 'Vite  M 4 X   8 Torx-Plus 20IP',           pezziSap: 24 },
+      { rowNumber: 7,  materiale: '409255',      descrizione: 'Vite M 6 x 20-8.8 DIN 6921',               pezziSap: 1 },
+      { rowNumber: 8,  materiale: '409271',      descrizione: 'Vite M8 x 16  classe 100',                 pezziSap: 2 },
+      { rowNumber: 9,  materiale: '420630',      descrizione: 'Perno filett. M 6 X10 DIN 914 45H-A2G',    pezziSap: 3 },
+      { rowNumber: 10, materiale: '441080',      descrizione: 'Guarnizione 24 x 17 x 2 DIN EN 1514-1',    pezziSap: 10 },
+      { rowNumber: 11, materiale: '453004',      descrizione: 'Raccordo  R 1/8 GES4',                     pezziSap: 24 },
+      { rowNumber: 12, materiale: '460007',      descrizione: 'Cuscinetti 6202LLU/5K DIN625 15X35X11',    pezziSap: 12 },
+      { rowNumber: 13, materiale: '490124',      descrizione: 'Molla blu  Stabilizzatore press. DN40',    pezziSap: 1 },
+      { rowNumber: 14, materiale: '600165',      descrizione: 'Apparecchiatura LFL 1.622 220-240V',       pezziSap: 1 },
+      { rowNumber: 15, materiale: '601792',      descrizione: 'Pompa di circolazione Magna3 32-120F 220', pezziSap: 19 },
+      { rowNumber: 16, materiale: '612201',      descrizione: 'Ugello S 60 0,60 GPH Steinen c. filtro',   pezziSap: 6 },
+      { rowNumber: 17, materiale: '625003',      descrizione: 'Gruppo multifunzione W-MF 512 220-240V',   pezziSap: 1 },
+      { rowNumber: 18, materiale: '640676',      descrizione: 'Stabilizzatore pressione FRS 507 Rp 3/4',  pezziSap: 1 },
+      { rowNumber: 19, materiale: '651010',      descrizione: 'Servomotore SQN90.220 220-240V 50-60HZ',   pezziSap: 2 },
+      { rowNumber: 20, materiale: '660228',      descrizione: 'Sonda temperatura NTC 5K STF 222.2',       pezziSap: 12 },
+      { rowNumber: 21, materiale: '690345',      descrizione: 'App. modulazione KS40-108-9090M-D35',      pezziSap: 2 },
+      { rowNumber: 22, materiale: '700903',      descrizione: 'Interruttore C2-U1Z con perno',            pezziSap: 2 },
+      { rowNumber: 23, materiale: '713118',      descrizione: 'Condensatore 1,2 µF  420V aletta 6,3',     pezziSap: 2 },
+      { rowNumber: 24, materiale: '743171',      descrizione: 'Cavo di comando schermato LiYCY   2X0,75', pezziSap: 755 },
+      { rowNumber: 25, materiale: '38050070',    descrizione: 'WS-PMS-P',                                 pezziSap: 1 },
+      { rowNumber: 26, materiale: '90012167',    descrizione: 'Adattatore per PC-Tool RS232 / USB',       pezziSap: 1 },
+      { rowNumber: 27, materiale: '950405912',   descrizione: 'Twinbloc Weishaupt WHT 2 senza compens.',  pezziSap: 1 },
+      { rowNumber: 28, materiale: '11050000102', descrizione: 'Servomotore 1055/23 110V 60Hz',            pezziSap: 1 },
+      { rowNumber: 29, materiale: '21010412212', descrizione: 'ModGate 2.0 Profibus IO per W-FM100/200',  pezziSap: 1 },
+      { rowNumber: 30, materiale: '23005008012', descrizione: 'Motore ECK02/H-2/1 230V 50Hz c.perno WG5', pezziSap: 1 },
+      { rowNumber: 31, materiale: '24005000110', descrizione: 'Set modifica app. acc.EBI con cavo spina', pezziSap: 2 },
+      { rowNumber: 32, materiale: '40900002292', descrizione: 'Set spegnimento pompa per risc. a pavim.', pezziSap: 2 },
+      { rowNumber: 33, materiale: '48000005087', descrizione: 'Tubo  PP  DN110  0,5m (5 p.cart.)',        pezziSap: 3 },
+      { rowNumber: 34, materiale: '50300105732', descrizione: 'Bobina valvola 4 vie',                     pezziSap: 1 },
+      { rowNumber: 35, materiale: '51150400012', descrizione: 'Gruppo di allacciam base WWP LS c. manom', pezziSap: 26 },
+      { rowNumber: 36, materiale: '52550803232', descrizione: 'Kit fissaggio WAB 8/11 cpl.',              pezziSap: 7 }
+    ];
+
+    // Normalizza codice SAP (ignora spazi e zeri iniziali sui codici puramente numerici)
+    function normalizeCode(val) {
+      if (val === null || val === undefined) return '';
+      const raw = String(val).trim().toUpperCase();
+      if (/^\d+$/.test(raw)) {
+        return raw.replace(/^0+/, '') || '0';
+      }
+      return raw;
+    }
+
+    // Confronto naturale crescente (dal codice più piccolo al più grande: es. 219 -> 391147 -> 401352)
+    function compareMaterialCodesAsc(a, b) {
+      const numA = Number(a.materiale);
+      const numB = Number(b.materiale);
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return numA - numB || a.rowNumber - b.rowNumber;
+      }
+      return String(a.materiale).localeCompare(String(b.materiale), undefined, { numeric: true, sensitivity: 'base' });
+    }
+
+    function playBeep(freq = 880, duration = 0.09) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initOperator();
+      loadCatalog();
+    });
+
+    function onCatalogBadgeClick() {
+      if (!API_URL) {
+        openSettingsModal();
+      } else {
+        loadCatalog();
+      }
+    }
+
+    function loadCatalog() {
+      const badge = document.getElementById('catalog-status');
+      badge.textContent = '⏳ Sincronizzazione...';
+
+      if (API_URL) {
+        apiCatalog()
+          .then(res => {
+            catalog = res.items || [];
+            badge.textContent = '🟢 ' + catalog.length + ' art. (' + res.sheetName + ')';
+            prepareWheelData();
+          })
+          .catch(err => {
+            badge.textContent = '🔴 Errore caricamento';
+            showToast('Errore lettura Foglio Google: ' + err.message, true);
+          });
+      } else {
+        // Modalità Demo locale con i 31 articoli reali dell'estratto SAP
+        catalog = SAMPLE_EXTRACT.map(item => ({
+          ...item,
+          materialeNorm: normalizeCode(item.materiale),
+          rilevato: null,
+          differenza: null
+        }));
+        badge.textContent = '⚙️ Collega Drive';
+        badge.title = 'Tocca per inserire l\'URL dell\'app Google Apps Script';
+        prepareWheelData();
+      }
+    }
+
+    /* ==========================================================================
+       SELETTORE A RULLO (SCORRIMENTO CODICI COME GLI ANNI NEI COMPILATORI)
+       ========================================================================== */
+    function prepareWheelData() {
+      // Garantisce che il rullo abbia tutti i codici ordinati dal più piccolo al più grande
+      sortedWheelCatalog = [...catalog].sort(compareMaterialCodesAsc);
+
+      if (sortedWheelCatalog.length > 0) {
+        const minCode = sortedWheelCatalog[0].materiale;
+        const maxCode = sortedWheelCatalog[sortedWheelCatalog.length - 1].materiale;
+        document.getElementById('wheel-range-label').textContent = minCode + ' → ' + maxCode;
+      }
+
+      const container = document.getElementById('wheel-items-container');
+      container.innerHTML = sortedWheelCatalog
+        .map((item, idx) => `
+          <div class="wheel-item" id="wheel-item-${idx}" onclick="scrollToWheelIndex(${idx}, true)">
+            <span class="wheel-code">${escapeHtml(item.materiale)}</span>
+            <span class="wheel-desc">${escapeHtml(item.descrizione)}</span>
+          </div>
+        `)
+        .join('');
+
+      buildWheelJumpChips();
+      updateWheelActiveItem(0);
+    }
+
+    // Crea i pulsanti di salto rapido per serie/prefisso
+    function buildWheelJumpChips() {
+      const jumpBar = document.getElementById('wheel-jump-bar');
+      if (sortedWheelCatalog.length <= 8) {
+        jumpBar.style.display = 'none';
+        return;
+      }
+
+      const groups = [];
+      const seenKeys = new Set();
+
+      sortedWheelCatalog.forEach((item, index) => {
+        const groupLabel = getPrefixGroupLabel(item.materiale);
+        if (!seenKeys.has(groupLabel)) {
+          seenKeys.add(groupLabel);
+          groups.push({ label: groupLabel, index: index });
+        }
+      });
+
+      jumpBar.style.display = 'flex';
+      jumpBar.innerHTML = groups
+        .map((g, i) => `
+          <button type="button" data-group="${escapeHtml(g.label)}" class="jump-chip ${i === 0 ? 'active' : ''}" onclick="jumpWheelToGroup(${g.index}, this)">
+            ${escapeHtml(g.label)}
+          </button>
+        `)
+        .join('');
+    }
+
+    function getPrefixGroupLabel(materiale) {
+      const code = String(materiale || '').trim();
+      if (code.length <= 6) {
+        return code.substring(0, 2) + 'xxxx';
+      }
+      if (code.length <= 9) {
+        return code.substring(0, 2) + 'x...';
+      }
+      return code.substring(0, 2) + 'xxxxxxxxx';
+    }
+
+    function jumpWheelToGroup(targetIndex, chipEl) {
+      document.querySelectorAll('.jump-chip').forEach(c => c.classList.remove('active'));
+      if (chipEl) {
+        chipEl.classList.add('active');
+        chipEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+      scrollToWheelIndex(targetIndex, false);
+    }
+
+    function toggleWheelPicker() {
+      const panel = document.getElementById('wheel-picker-panel');
+      if (panel.style.display === 'block') {
+        closeWheelPicker();
+      } else {
+        openWheelPicker();
+      }
+    }
+
+    async function openWheelPicker() {
+      await stopAllCameras();
+      document.getElementById('suggestions').style.display = 'none';
+      const panel = document.getElementById('wheel-picker-panel');
+      panel.style.display = 'block';
+
+      // Se nel campo di testo c'è già l'inizio di un codice, posiziona il rullo sul codice più vicino
+      const typed = document.getElementById('code-input').value.trim();
+      let startIdx = currentWheelIndex;
+      if (typed) {
+        const matchIdx = sortedWheelCatalog.findIndex(item => item.materiale.startsWith(typed));
+        if (matchIdx !== -1) startIdx = matchIdx;
+      }
+
+      setTimeout(() => {
+        scrollToWheelIndex(startIdx, false);
+      }, 30);
+    }
+
+    function closeWheelPicker() {
+      document.getElementById('wheel-picker-panel').style.display = 'none';
+    }
+
+    function scrollToWheelIndex(idx, smooth = true) {
+      const scroller = document.getElementById('wheel-scroller');
+      const clamped = Math.max(0, Math.min(sortedWheelCatalog.length - 1, idx));
+      scroller.scrollTo({
+        top: clamped * WHEEL_ITEM_HEIGHT,
+        behavior: smooth ? 'smooth' : 'auto'
+      });
+      updateWheelActiveItem(clamped);
+    }
+
+    function onWheelScroll() {
+      if (wheelScrollRAF) cancelAnimationFrame(wheelScrollRAF);
+      wheelScrollRAF = requestAnimationFrame(() => {
+        const scroller = document.getElementById('wheel-scroller');
+        const idx = Math.round(scroller.scrollTop / WHEEL_ITEM_HEIGHT);
+        const clamped = Math.max(0, Math.min(sortedWheelCatalog.length - 1, idx));
+        if (clamped !== currentWheelIndex) {
+          updateWheelActiveItem(clamped);
+        }
+      });
+    }
+
+    function updateWheelActiveItem(newIndex) {
+      if (!sortedWheelCatalog.length) return;
+      const prevEl = document.getElementById('wheel-item-' + currentWheelIndex);
+      if (prevEl) prevEl.classList.remove('active');
+
+      currentWheelIndex = newIndex;
+      const nextEl = document.getElementById('wheel-item-' + currentWheelIndex);
+      if (nextEl) nextEl.classList.add('active');
+
+      const item = sortedWheelCatalog[currentWheelIndex];
+      document.getElementById('wheel-pos-indicator').textContent =
+        (currentWheelIndex + 1) + ' / ' + sortedWheelCatalog.length;
+      document.getElementById('wheel-sel-code').textContent = 'Cod. ' + item.materiale;
+      document.getElementById('wheel-sel-meta').textContent = 'Pezzi SAP: ' + item.pezziSap;
+      document.getElementById('wheel-sel-desc').textContent = item.descrizione;
+
+      // Evidenzia automaticamente il pulsante del prefisso corrispondente al codice attuale
+      // e fa scorrere la barra orizzontale per mantenere il prefisso visibile al centro
+      const activeGroupLabel = getPrefixGroupLabel(item.materiale);
+      document.querySelectorAll('.jump-chip').forEach(chip => {
+        const isMatch = chip.dataset.group === activeGroupLabel;
+        if (isMatch && !chip.classList.contains('active')) {
+          chip.classList.add('active');
+          chip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        } else if (!isMatch) {
+          chip.classList.remove('active');
+        }
+      });
+    }
+
+    function confirmWheelSelection() {
+      if (!sortedWheelCatalog.length) return;
+      const chosen = sortedWheelCatalog[currentWheelIndex];
+      playBeep(980, 0.07);
+      document.getElementById('code-input').value = chosen.materiale;
+      closeWheelPicker();
+      renderProductCard(chosen, false); // Da scroll: sblocca subito la quantità
+    }
+
+    /* ==========================================================================
+       FOTOCAMERA 1: BARCODE / EAN LIVE (rilevamento automatico mentre inquadri)
+       ========================================================================== */
+    async function startBarcodeScanner() {
+      closeWheelPicker();
+      await stopAllCameras();
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        triggerNativeCamera('barcode');
+        return;
+      }
+
+      const wrapper = document.getElementById('camera-wrapper');
+      const readerEl = document.getElementById('reader');
+      wrapper.style.display = 'block';
+      readerEl.style.display = 'block';
+      document.getElementById('scan-mode-label').textContent = 'INQUADRA IL CODICE A BARRE';
+
+      const F = Html5QrcodeSupportedFormats;
+      html5QrCode = new Html5Qrcode('reader', {
+        formatsToSupport: [
+          F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39,
+          F.CODE_93, F.ITF, F.CODABAR, F.QR_CODE, F.DATA_MATRIX
+        ],
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        verbose: false
+      });
+
+      try {
+        await html5QrCode.start(
+          { facingMode: 'environment' },
+          {
+            fps: 15,
+            // Riquadro largo e basso, adatto ai codici a barre lineari
+            qrbox: (w, h) => {
+              const boxW = Math.floor(w * 0.85);
+              const boxH = Math.floor(Math.min(h * 0.45, boxW * 0.5));
+              return { width: boxW, height: Math.max(boxH, 80) };
+            }
+          },
+          decodedText => {
+            playBeep();
+            stopAllCameras();
+            const cleaned = decodedText.trim();
+            document.getElementById('code-input').value = cleaned;
+            searchByCode(cleaned, true); // Da fotocamera: richiede conferma intermedia
+          },
+          () => {}
+        );
+      } catch (err) {
+        await stopAllCameras();
+        showToast(
+          '❌ Fotocamera non disponibile: ' + escapeHtml(String(err)) +
+          '<br>Controlla di aver consentito l\'accesso alla fotocamera per questo sito.',
+          true
+        );
+      }
+    }
+
+    /* ==========================================================================
+       FOTOCAMERA 2: OCR LIVE (legge il testo in continuo e si ferma da solo
+       quando riconosce un codice presente nel file)
+       ========================================================================== */
+    let ocrWorker = null;
+    let ocrLoopTimer = null;
+    let ocrBusy = false;
+    let ocrLastCandidate = '';
+    let ocrStartedAt = 0;
+
+    async function getOcrWorker() {
+      if (ocrWorker) return ocrWorker;
+      ocrWorker = await Tesseract.createWorker('eng');
+      await ocrWorker.setParameters({
+        tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-./ '
+      });
+      return ocrWorker;
+    }
+
+    async function startOcrScanner() {
+      closeWheelPicker();
+      await stopAllCameras();
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        triggerNativeCamera('ocr');
+        return;
+      }
+
+      const wrapper = document.getElementById('camera-wrapper');
+      const video = document.getElementById('ocr-video');
+      const overlay = document.getElementById('ocr-overlay');
+      const btnCapture = document.getElementById('btn-capture-ocr');
+      const label = document.getElementById('scan-mode-label');
+
+      wrapper.style.display = 'block';
+      video.style.display = 'block';
+      overlay.style.display = 'flex';
+      btnCapture.style.display = 'inline-flex';
+      btnCapture.textContent = '✏️ Usa il testo letto';
+      label.textContent = '⏳ Avvio lettura testo...';
+
+      try {
+        ocrStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        video.srcObject = ocrStream;
+        await video.play().catch(() => {});
+      } catch (err) {
+        await stopAllCameras();
+        showToast(
+          '❌ Fotocamera non disponibile: ' + escapeHtml(err.message || String(err)) +
+          '<br>Controlla di aver consentito l\'accesso alla fotocamera per questo sito.',
+          true
+        );
+        return;
+      }
+
+      try {
+        await getOcrWorker();
+      } catch (err) {
+        await stopAllCameras();
+        showToast('❌ Impossibile caricare il motore OCR: ' + escapeHtml(err.message || String(err)), true);
+        return;
+      }
+
+      ocrLastCandidate = '';
+      ocrStartedAt = Date.now();
+      label.textContent = '🔍 INQUADRA IL CODICE NEL RIQUADRO';
+      ocrLoopTimer = setInterval(ocrTick, 900);
+    }
+
+    // Ritaglia la fascia centrale (riquadro tratteggiato) e la prepara per l'OCR
+    function grabOcrFrame(video) {
+      const cropW = video.videoWidth * 0.82;
+      const cropH = video.videoHeight * 0.28;
+      const startX = (video.videoWidth - cropW) / 2;
+      const startY = (video.videoHeight - cropH) / 2;
+
+      const scale = Math.min(2, 1400 / cropW);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(cropW * scale);
+      canvas.height = Math.round(cropH * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, startX, startY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+
+      // Scala di grigi + contrasto per etichette sbiadite
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        let g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        g = (g - 128) * 1.6 + 128;
+        g = g < 0 ? 0 : g > 255 ? 255 : g;
+        d[i] = d[i + 1] = d[i + 2] = g;
+      }
+      ctx.putImageData(img, 0, 0);
+      return canvas;
+    }
+
+    // Cerca nel testo letto un codice presente nel catalogo
+    function findCatalogCodeInText(rawText) {
+      const text = rawText.toUpperCase();
+      const tokens = text.split(/[^A-Z0-9\-_\/\.]+/).filter(t => t.length >= 3);
+
+      // Anche sequenze di cifre spezzate da spazi (es. "1105 0000 102")
+      const digitRuns = (text.match(/\d[\d ]{4,}\d/g) || []).map(s => s.replace(/ /g, ''));
+      const candidates = [...tokens, ...digitRuns];
+
+      for (const t of candidates) {
+        const norm = normalizeCode(t.replace(/[.\/]+$/, ''));
+        const hit = catalog.find(item => item.materialeNorm === norm);
+        if (hit) return { code: hit.materiale, inCatalog: true };
+      }
+
+      // Nessuna corrispondenza: restituisce il candidato numerico più lungo
+      const best = candidates
+        .filter(t => /\d{4,}/.test(t))
+        .sort((a, b) => b.length - a.length)[0];
+      return best ? { code: best, inCatalog: false } : null;
+    }
+
+    async function ocrTick() {
+      const video = document.getElementById('ocr-video');
+      const label = document.getElementById('scan-mode-label');
+      if (ocrBusy || !ocrStream || !video.videoWidth) return;
+      ocrBusy = true;
+
+      try {
+        const worker = await getOcrWorker();
+        const canvas = grabOcrFrame(video);
+        const result = await worker.recognize(canvas);
+        if (!ocrStream) return; // fotocamera chiusa nel frattempo
+
+        const found = findCatalogCodeInText(result.data.text || '');
+        if (found && found.inCatalog) {
+          playBeep();
+          await stopAllCameras();
+          document.getElementById('code-input').value = found.code;
+          searchByCode(found.code, true); // Da OCR: richiede conferma intermedia
+          return;
+        }
+
+        if (found) {
+          ocrLastCandidate = found.code;
+          label.textContent = '🔍 Letto: ' + found.code + ' (non in elenco)';
+        }
+
+        if (Date.now() - ocrStartedAt > 20000 && !ocrLastCandidate) {
+          label.textContent = '💡 Avvicinati o migliora la luce';
+        }
+      } catch (e) {
+        // ignora il fotogramma e riprova al giro successivo
+      } finally {
+        ocrBusy = false;
+      }
+    }
+
+    // Pulsante "Usa il testo letto": passa al campo manuale l'ultimo codice letto (anche se non in elenco)
+    async function captureOcrFrame() {
+      const btnCapture = document.getElementById('btn-capture-ocr');
+      let candidate = ocrLastCandidate;
+
+      if (!candidate) {
+        const video = document.getElementById('ocr-video');
+        if (video.videoWidth) {
+          btnCapture.disabled = true;
+          btnCapture.textContent = '⏳ Lettura...';
+          try {
+            const worker = await getOcrWorker();
+            const result = await worker.recognize(grabOcrFrame(video));
+            const found = findCatalogCodeInText(result.data.text || '');
+            if (found) candidate = found.code;
+          } catch (e) {}
+          btnCapture.disabled = false;
+          btnCapture.textContent = '✏️ Usa il testo letto';
+        }
+      }
+
+      await stopAllCameras();
+      const input = document.getElementById('code-input');
+      if (candidate) {
+        input.value = candidate;
+        searchByCode(candidate, true);
+      } else {
+        showToast('Nessun codice leggibile. Digitalo a mano o usa la ricerca a scorrimento.', true);
+        input.focus();
+      }
+    }
+
+    /* ==========================================================================
+       FALLBACK: FOTO NATIVA (solo se il browser non supporta la fotocamera live)
+       ========================================================================== */
+    function triggerNativeCamera(mode) {
+      const inputId = mode === 'barcode' ? 'native-camera-barcode' : 'native-camera-ocr';
+      const fileInput = document.getElementById(inputId);
+      if (fileInput) {
+        fileInput.value = '';
+        fileInput.click();
+      }
+    }
+
+    async function onNativePhotoSelected(inputEl, mode) {
+      const file = inputEl.files && inputEl.files[0];
+      if (!file) return;
+
+      if (mode === 'barcode') {
+        showToast('⏳ Analisi codice a barre dalla foto...', false);
+        try {
+          const tempScanner = new Html5Qrcode('reader');
+          const decodedText = await tempScanner.scanFile(file, false);
+          tempScanner.clear();
+          playBeep();
+          const cleaned = decodedText.trim();
+          document.getElementById('code-input').value = cleaned;
+          searchByCode(cleaned, true);
+        } catch (err) {
+          showToast('❌ Nessun codice a barre nitido trovato nella foto.', true);
+        }
+      } else {
+        showToast('⏳ Lettura testo dalla foto...', false);
+        try {
+          const worker = await getOcrWorker();
+          const result = await worker.recognize(file);
+          const found = findCatalogCodeInText(result.data.text || '');
+          if (!found) {
+            showToast('❌ Nessun codice leggibile nella foto.', true);
+            return;
+          }
+          playBeep();
+          document.getElementById('code-input').value = found.code;
+          searchByCode(found.code, true);
+        } catch (err) {
+          showToast('Errore OCR foto: ' + escapeHtml(err.message || String(err)), true);
+        }
+      }
+    }
+
+    async function stopAllCameras() {
+      document.getElementById('scan-mode-label').textContent = '';
+      if (ocrLoopTimer) {
+        clearInterval(ocrLoopTimer);
+        ocrLoopTimer = null;
+      }
+      if (html5QrCode) {
+        try {
+          if (html5QrCode.isScanning) {
+            await html5QrCode.stop();
+          }
+          html5QrCode.clear();
+        } catch (e) {}
+        html5QrCode = null;
+      }
+      if (ocrStream) {
+        ocrStream.getTracks().forEach(t => t.stop());
+        ocrStream = null;
+      }
+      document.getElementById('reader').style.display = 'none';
+      document.getElementById('ocr-video').style.display = 'none';
+      document.getElementById('ocr-overlay').style.display = 'none';
+      document.getElementById('btn-capture-ocr').style.display = 'none';
+      document.getElementById('camera-wrapper').style.display = 'none';
+    }
+
+    /* ==========================================================================
+       RICERCA CODICE MATERIALE E AUTOCOMPLETAMENTO
+       ========================================================================== */
+    function onCodeInputChange(query) {
+      const sugBox = document.getElementById('suggestions');
+      const q = query.trim().toUpperCase();
+      if (q.length < 1) {
+        sugBox.style.display = 'none';
+        return;
+      }
+
+      const qNorm = normalizeCode(q);
+      const matches = catalog
+        .filter(item =>
+          item.materiale.toUpperCase().includes(q) ||
+          item.materialeNorm.includes(qNorm) ||
+          item.descrizione.toUpperCase().includes(q)
+        )
+        .slice(0, 6);
+
+      if (matches.length === 0) {
+        sugBox.style.display = 'none';
+        return;
+      }
+
+      sugBox.innerHTML = matches
+        .map(item => `
+          <div class="suggestion-item" onclick="selectCatalogItem(${item.rowNumber})">
+            <div>
+              <div class="sug-code">${escapeHtml(item.materiale)}</div>
+              <div class="sug-desc">${escapeHtml(item.descrizione)}</div>
+            </div>
+            <div style="font-size:0.8rem; color:#cbd5e1;">Pezzi: ${item.pezziSap}</div>
+          </div>
+        `)
+        .join('');
+      sugBox.style.display = 'block';
+    }
+
+    function searchByInput() {
+      const val = document.getElementById('code-input').value.trim();
+      searchByCode(val, false);
+    }
+
+    function searchByCode(code, requireConfirmation = false) {
+      document.getElementById('suggestions').style.display = 'none';
+      document.getElementById('toast').style.display = 'none';
+
+      if (!code) return;
+      const targetNorm = normalizeCode(code);
+
+      const exactMatches = catalog.filter(
+        item => item.materiale.toUpperCase() === code.toUpperCase() || item.materialeNorm === targetNorm
+      );
+
+      if (exactMatches.length === 1) {
+        renderProductCard(exactMatches[0], requireConfirmation);
+        return;
+      }
+
+      if (exactMatches.length > 1) {
+        onCodeInputChange(code);
+        showToast('Trovate ' + exactMatches.length + ' righe per questo Materiale. Seleziona la riga corretta qui sopra.', false);
+        return;
+      }
+
+      const partial = catalog.filter(
+        item => item.materiale.toUpperCase().includes(code.toUpperCase()) ||
+                item.descrizione.toUpperCase().includes(code.toUpperCase())
+      );
+
+      if (partial.length === 1) {
+        renderProductCard(partial[0], requireConfirmation);
+      } else if (partial.length > 1) {
+        onCodeInputChange(code);
+        showToast('Codice esatto non trovato. Seleziona uno dei ' + partial.length + ' risultati simili, oppure aggiungilo come nuovo.', true);
+      } else {
+        document.getElementById('product-card').style.display = 'none';
+        const safeCode = escapeHtml(code);
+        showToast(
+          `❌ Codice Materiale <strong>"${safeCode}"</strong> non presente nel file Excel.<br>` +
+          `<button type="button" class="btn btn-add-new-inline" onclick="openNewItemForm('${safeCode.replace(/'/g, "\\'")}')">` +
+          `➕ Aggiungi "${safeCode}" sul file ex-novo</button>`,
+          true
+        );
+      }
+    }
+
+    function openNewItemForm(prefillCode) {
+      closeWheelPicker();
+      document.getElementById('suggestions').style.display = 'none';
+      document.getElementById('product-card').style.display = 'none';
+      document.getElementById('toast').style.display = 'none';
+
+      document.getElementById('new-mat').value = prefillCode || '';
+      document.getElementById('new-desc').value = '';
+      document.getElementById('new-qty').value = '';
+
+      document.getElementById('new-item-card').style.display = 'block';
+      if (prefillCode) {
+        document.getElementById('new-desc').focus();
+      } else {
+        document.getElementById('new-mat').focus();
+      }
+    }
+
+    function closeNewItemForm() {
+      document.getElementById('new-item-card').style.display = 'none';
+    }
+
+    function stepNewQty(delta) {
+      const qtyInput = document.getElementById('new-qty');
+      const current = parseFloat(qtyInput.value) || 0;
+      const next = Math.max(0, Number((current + delta).toFixed(4)));
+      qtyInput.value = next;
+    }
+
+    function submitNewItem() {
+      const materiale = document.getElementById('new-mat').value.trim();
+      const descrizione = document.getElementById('new-desc').value.trim();
+      const qtyRaw = document.getElementById('new-qty').value.replace(',', '.').trim();
+      const quantita = parseFloat(qtyRaw);
+
+      if (!materiale) {
+        showToast('Inserisci il Codice Materiale (Col. A) da creare.', true);
+        return;
+      }
+      if (!descrizione) {
+        showToast('Inserisci la Descr. materiale (Col. B) per il nuovo articolo.', true);
+        return;
+      }
+      if (qtyRaw === '' || isNaN(quantita) || quantita < 0) {
+        showToast('Inserisci una Quantità Rilevata valida (Col. D).', true);
+        return;
+      }
+
+      const norm = normalizeCode(materiale);
+      const existing = catalog.find(i => i.materialeNorm === norm);
+      if (existing) {
+        closeNewItemForm();
+        renderProductCard(existing);
+        showToast('Questo codice esiste già alla Riga #' + existing.rowNumber + '. Eccolo caricato qui sotto.', false);
+        return;
+      }
+
+      const btn = document.getElementById('btn-submit-new');
+      btn.disabled = true;
+      btn.textContent = '⏳ Creazione riga su Excel...';
+
+      const operatore = currentOperator || 'Operatore';
+      const payload = { materiale, descrizione, quantita, operatore };
+
+      if (API_URL) {
+        apiPost('add', payload)
+          .then(res => {
+            btn.disabled = false;
+            btn.textContent = '💾 Salva Nuovo Codice su Excel';
+            onNewItemAddedSuccess(res);
+          })
+          .catch(err => {
+            btn.disabled = false;
+            btn.textContent = '💾 Salva Nuovo Codice su Excel';
+            showToast('Errore creazione articolo: ' + err.message, true);
+          });
+      } else {
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = '💾 Salva Nuovo Codice su Excel';
+          const nextRow = catalog.reduce((max, i) => Math.max(max, i.rowNumber), 1) + 1;
+          const now = new Date();
+          const hhmm = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+          onNewItemAddedSuccess({
+            isNewItem: true,
+            rowNumber: nextRow,
+            materiale: materiale,
+            descrizione: descrizione,
+            pezziSap: 0,
+            rilevatoPrecedente: null,
+            rilevatoNuovo: quantita,
+            differenza: quantita,
+            operatore: operatore + ' (' + hhmm + ' - Nuovo)'
+          });
+        }, 200);
+      }
+    }
+
+    function onNewItemAddedSuccess(res) {
+      closeNewItemForm();
+
+      const newCatalogEntry = {
+        rowNumber: res.rowNumber,
+        materiale: res.materiale,
+        materialeNorm: normalizeCode(res.materiale),
+        descrizione: res.descrizione,
+        pezziSap: res.pezziSap,
+        rilevato: res.rilevatoNuovo,
+        differenza: res.differenza,
+        operatore: res.operatore || null
+      };
+      catalog.push(newCatalogEntry);
+      prepareWheelData();
+
+      playBeep(1040, 0.12);
+      const diffSign = res.differenza > 0 ? '+' + res.differenza : String(res.differenza);
+      const isZero = res.differenza === 0;
+
+      showToast(
+        `🆕 <strong>NUOVO CODICE AGGIUNTO ALLA RIGA #${res.rowNumber}</strong><br>` +
+        `<strong>${escapeHtml(res.materiale)}</strong> (${escapeHtml(res.descrizione)}) — Rilevato: <strong>${res.rilevatoNuovo}</strong> in Col. D | Diff: <strong>${diffSign}</strong><br>` +
+        `<span style="font-size:0.82rem; opacity:0.9;">👤 Registrato da: ${escapeHtml(res.operatore || currentOperator)}</span>`,
+        !isZero
+      );
+
+      sessionHistory.unshift(res);
+      renderHistory();
+      document.getElementById('code-input').value = '';
+    }
+
+    function selectCatalogItem(rowNumber) {
+      document.getElementById('suggestions').style.display = 'none';
+      const found = catalog.find(i => i.rowNumber === rowNumber);
+      if (found) {
+        document.getElementById('code-input').value = found.materiale;
+        renderProductCard(found, false);
+      }
+    }
+
+    /* ==========================================================================
+       MOSTRA DESCRIZIONE -> CONFERMA (SE DA FOTOCAMERA) -> QUANTITA' RILEVATA
+       ========================================================================== */
+    function renderProductCard(item, requireConfirmation = false) {
+      selectedItem = item;
+      document.getElementById('toast').style.display = 'none';
+
+      const wIdx = sortedWheelCatalog.findIndex(w => w.rowNumber === item.rowNumber);
+      if (wIdx !== -1) currentWheelIndex = wIdx;
+
+      document.getElementById('item-row-badge').textContent = 'Riga #' + item.rowNumber;
+      document.getElementById('item-mat').textContent = item.materiale;
+      document.getElementById('item-desc').textContent = item.descrizione || '(Nessuna descrizione)';
+      document.getElementById('item-sap-qty').textContent = item.pezziSap;
+
+      const hasPrevious = item.rilevato !== null && item.rilevato !== undefined;
+      const alreadyBanner = document.getElementById('already-counted');
+      if (hasPrevious) {
+        const whoInfo = item.operatore
+          ? ` da <strong>👤 ${escapeHtml(item.operatore)}</strong>`
+          : '';
+        alreadyBanner.style.display = 'block';
+        alreadyBanner.innerHTML =
+          `⚠️ <strong>Articolo già contato:</strong> in Colonna D c'è già <strong>${item.rilevato}</strong>` +
+          `${whoInfo}.<br>Scegli sotto se <em>Sommare</em> o <em>Sovrascrivere</em>.`;
+      } else {
+        alreadyBanner.style.display = 'none';
+      }
+
+      const confirmGate = document.getElementById('camera-confirm-gate');
+      const qtySection = document.getElementById('quantity-section');
+      const qtyInput = document.getElementById('qty-input');
+      qtyInput.value = hasPrevious ? item.rilevato : item.pezziSap;
+
+      document.getElementById('btn-save-single').style.display = hasPrevious ? 'none' : 'inline-flex';
+      document.getElementById('duplicate-actions').style.display = hasPrevious ? 'grid' : 'none';
+
+      if (requireConfirmation) {
+        // Da Fotocamera (EAN o OCR): mostra prima i pulsanti di conferma/correzione prodotto
+        confirmGate.style.display = 'flex';
+        qtySection.style.display = 'none';
+      } else {
+        // Da Scroll o selezione manuale: sblocca subito la quantità
+        confirmGate.style.display = 'none';
+        qtySection.style.display = 'block';
+      }
+
+      document.getElementById('product-card').style.display = 'block';
+      document.getElementById('product-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function unlockQuantityFromCamera() {
+      if (!selectedItem) return;
+      document.getElementById('camera-confirm-gate').style.display = 'none';
+      document.getElementById('quantity-section').style.display = 'block';
+      const qtyInput = document.getElementById('qty-input');
+      qtyInput.focus();
+      qtyInput.select();
+    }
+
+    function correctScannedCode() {
+      document.getElementById('product-card').style.display = 'none';
+      const input = document.getElementById('code-input');
+      input.focus();
+      input.select();
+    }
+
+    function stepQty(delta) {
+      const qtyInput = document.getElementById('qty-input');
+      const current = parseFloat(String(qtyInput.value).replace(',', '.')) || 0;
+      const next = Math.max(0, Number((current + delta).toFixed(4)));
+      qtyInput.value = next;
+    }
+
+    function handlePrimarySave() {
+      if (!selectedItem) return;
+      const hasPrevious = selectedItem.rilevato !== null && selectedItem.rilevato !== undefined;
+      submitInventory(hasPrevious ? 'add' : 'replace');
+    }
+
+    /* ==========================================================================
+       SALVATAGGIO SU GOOGLE SHEET (COLONNA D = RILEVATO, COLONNA E = DIFFERENZA)
+       ========================================================================== */
+    function submitInventory(mode) {
+      if (!selectedItem) return;
+      const qtyRaw = document.getElementById('qty-input').value.replace(',', '.').trim();
+      const qty = parseFloat(qtyRaw);
+
+      if (qtyRaw === '' || isNaN(qty) || qty < 0) {
+        showToast('Inserisci una quantità valida (0 o superiore).', true);
+        return;
+      }
+
+      const operatore = currentOperator || 'Operatore';
+      const payload = {
+        rowNumber: selectedItem.rowNumber,
+        materiale: selectedItem.materiale,
+        quantita: qty,
+        mode: mode,
+        operatore: operatore
+      };
+
+      setSavingState(true);
+
+      if (API_URL) {
+        apiPost('save', payload)
+          .then(res => {
+            setSavingState(false);
+            onSaveSuccess(res);
+          })
+          .catch(err => {
+            setSavingState(false);
+            showToast('Errore salvataggio: ' + err.message, true);
+          });
+      } else {
+        setTimeout(() => {
+          setSavingState(false);
+          const prev = selectedItem.rilevato;
+          const nuovo = (mode === 'add' && prev !== null) ? (prev + qty) : qty;
+          const diff = Number((nuovo - selectedItem.pezziSap).toFixed(4));
+          const now = new Date();
+          const hhmm = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+          const opString = (mode === 'add' && selectedItem.operatore)
+            ? (selectedItem.operatore + ' + ' + operatore + ' (' + hhmm + ')')
+            : (operatore + ' (' + hhmm + ')');
+
+          onSaveSuccess({
+            rowNumber: selectedItem.rowNumber,
+            materiale: selectedItem.materiale,
+            descrizione: selectedItem.descrizione,
+            rilevatoPrecedente: prev,
+            rilevatoNuovo: nuovo,
+            pezziSap: selectedItem.pezziSap,
+            differenza: diff,
+            operatore: opString
+          });
+        }, 200);
+      }
+    }
+
+    function setSavingState(saving) {
+      const btns = document.querySelectorAll('#quantity-section button');
+      btns.forEach(b => (b.disabled = saving));
+    }
+
+    function onSaveSuccess(res) {
+      const idx = catalog.findIndex(i => i.rowNumber === res.rowNumber);
+      if (idx !== -1) {
+        catalog[idx].rilevato = res.rilevatoNuovo;
+        catalog[idx].differenza = res.differenza;
+        catalog[idx].operatore = res.operatore || null;
+      }
+
+      const diffSign = res.differenza > 0 ? '+' + res.differenza : String(res.differenza);
+      const isZero = res.differenza === 0;
+
+      showToast(
+        `${isZero ? '🟢 ALLINEATO (Diff: 0)' : '🔴 SQUADRATURA (Diff: ' + diffSign + ')'}<br>` +
+        `<strong>${escapeHtml(res.materiale)}</strong> — Salvato <strong>${res.rilevatoNuovo}</strong> in Colonna D (SAP: ${res.pezziSap})<br>` +
+        `<span style="font-size:0.82rem; opacity:0.9;">👤 Colonna F: ${escapeHtml(res.operatore || currentOperator)}</span>`,
+        !isZero
+      );
+
+      sessionHistory.unshift(res);
+      renderHistory();
+
+      document.getElementById('product-card').style.display = 'none';
+      const codeInput = document.getElementById('code-input');
+      codeInput.value = '';
+      selectedItem = null;
+    }
+
+    function renderHistory() {
+      document.getElementById('session-counter').textContent = sessionHistory.length;
+      const list = document.getElementById('history-list');
+      list.innerHTML = sessionHistory
+        .slice(0, 8)
+        .map(h => {
+          const isZero = h.differenza === 0;
+          const diffLabel = h.differenza > 0 ? '+' + h.differenza : h.differenza;
+          return `
+            <div class="history-item">
+              <div>
+                <div style="font-weight:700; color:#f8fafc;">${escapeHtml(h.materiale)} <span style="font-weight:400; color:#94a3b8;">(Ril: ${h.rilevatoNuovo})</span></div>
+                <div style="font-size:0.78rem; color:#94a3b8;">${escapeHtml(h.descrizione)}</div>
+                ${h.operatore ? `<div style="font-size:0.74rem; color:#6ee7b7; margin-top:2px;">👤 ${escapeHtml(h.operatore)}</div>` : ''}
+              </div>
+              <span class="badge-diff ${isZero ? 'badge-green' : 'badge-red'}">
+                Diff: ${diffLabel}
+              </span>
+            </div>
+          `;
+        })
+        .join('');
+    }
+
+    function showToast(htmlMsg, isErrorOrDiff) {
+      const t = document.getElementById('toast');
+      t.className = isErrorOrDiff ? 'toast-diff' : 'toast-zero';
+      t.innerHTML = htmlMsg;
+      t.style.display = 'block';
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>
