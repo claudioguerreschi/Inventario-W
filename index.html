@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0f172a" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Inventario" />
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="icon-192.png" />
@@ -65,8 +65,10 @@
       background: #1e293b;
       border-bottom: 1px solid var(--card-border);
       padding: 10px 12px;
+      padding-top: calc(10px + env(safe-area-inset-top, 0px));
+      padding-left: calc(12px + env(safe-area-inset-left, 0px));
+      padding-right: calc(12px + env(safe-area-inset-right, 0px));
       width: 100%;
-      max-width: 100vw;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -1146,20 +1148,26 @@
 
     /* ==========================================================================
        COLLEGAMENTO AL FOGLIO GOOGLE (API Apps Script)
-       Incolla qui l'URL /exec del deployment Apps Script.
-       In alternativa apri una volta la pagina con ?api=URL_EXEC e verrà memorizzato.
        ========================================================================== */
-    const DEFAULT_API_URL = 'INCOLLA_QUI_URL_EXEC';
+    const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbz7Z_pG0Z8nKx7SfOw9tOW-zbbwGjEmse4zB068gBrgPDVplPVpwYElSRGeF43UEK51/exec';
+
+    function cleanApiUrl(url) {
+      if (!url) return '';
+      let clean = url.trim();
+      const qIdx = clean.indexOf('?');
+      if (qIdx !== -1) clean = clean.substring(0, qIdx);
+      return clean;
+    }
 
     function getApiUrl() {
       try {
         const qp = new URLSearchParams(window.location.search).get('api');
-        if (qp) localStorage.setItem('inv_sap_api_url', qp.trim());
+        if (qp) localStorage.setItem('inv_sap_api_url', cleanApiUrl(qp));
       } catch (e) {}
       let saved = '';
-      try { saved = (localStorage.getItem('inv_sap_api_url') || '').trim(); } catch (e) {}
-      if (saved) return saved;
-      return DEFAULT_API_URL.indexOf('https://') === 0 ? DEFAULT_API_URL : '';
+      try { saved = cleanApiUrl(localStorage.getItem('inv_sap_api_url') || ''); } catch (e) {}
+      if (saved && saved.startsWith('https://')) return saved;
+      return DEFAULT_API_URL.indexOf('https://') === 0 ? cleanApiUrl(DEFAULT_API_URL) : '';
     }
 
     let API_URL = getApiUrl();
@@ -1178,7 +1186,7 @@
 
     function saveApiUrl() {
       const input = document.getElementById('api-url-input');
-      const val = input.value.trim();
+      let val = cleanApiUrl(input.value);
       if (val && !val.startsWith('https://')) {
         alert('Inserisci un URL valido che inizia con https://');
         return;
